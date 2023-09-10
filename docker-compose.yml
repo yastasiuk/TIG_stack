@@ -74,9 +74,9 @@ services:
         hard: -1
     volumes:
       - es_data:/var/lib/elasticsearch/data
-#    ports:
-#      - 9200:9200
-#      - 9300:9300
+    ports:
+      - 9200:9200
+      - 9300:9300
     networks:
       - webapp-network
 
@@ -123,7 +123,4 @@ networks:
     driver: bridge
   reporting-network:
     driver: bridge
-  default:
-    external:
-      name: nginx_network
 
