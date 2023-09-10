@@ -6,7 +6,7 @@ This repo create TIG stack example based on following architecture
 ## Start the stack with docker compose
 
 ```bash
-$ docker-compose up
+$ docker-compose up --build
 ```
 
 ## Services and Ports
@@ -51,6 +51,8 @@ There are 3 provisioned boards in grafana
 1. Requests per second
 1. Response time
 1. Success/Failed requests per database (mongo/elastic.)
+
+![Grafana example](./docs/grafana_example.png?raw=true "Grafana example")
 
 ## License
 

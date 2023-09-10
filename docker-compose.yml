@@ -74,9 +74,9 @@ services:
         hard: -1
     volumes:
       - es_data:/var/lib/elasticsearch/data
-    ports:
-      - 9200:9200
-      - 9300:9300
+#    ports:
+#      - 9200:9200
+#      - 9300:9300
     networks:
       - webapp-network
 
@@ -101,7 +101,9 @@ services:
       - MONGO_PASSWORD=example
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - PORT=8080
-    command: "npm run start:dev"
+#    command: "npm run start:dev"
+    command: "node ./dist/main.js"
+    restart: always
     depends_on:
       - elasticsearch
       - mongo
