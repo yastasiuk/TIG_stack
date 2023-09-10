@@ -1,39 +1,129 @@
 version: '3.6'
 services:
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+      - grafana
+    networks:
+      - webapp-network
+
   telegraf:
-    image: telegraf:1.18-alpine
+    image: telegraf:1.27
     volumes:
     - ./telegraf/etc/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     depends_on:
       - influxdb
-    links:
-      - influxdb
     ports:
-    - '127.0.0.1:8125:8125/udp'
+      - '127.0.0.1:8125:8125/udp'
+    networks:
+      - webapp-network
+      - reporting-network
 
   influxdb:
-    image: influxdb:1.8-alpine
-    env_file: configuration.env
+    container_name: influxdb
+    image: influxdb:2.7
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin_password
+      - DOCKER_INFLUXDB_INIT_ORG=projector_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=projector_bucket
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=auth_token
     ports:
-      - '127.0.0.1:8086:8086'
+      - '8086:8086'
     volumes:
-      - ./:/imports
-      - influxdb_data:/var/lib/influxdb
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - reporting-network
 
   grafana:
     image: grafana/grafana:8.0.2
     depends_on:
       - influxdb
-    env_file: configuration.env
-    links:
-      - influxdb
-    ports:
-      - '127.0.0.1:3000:3000'
+    environment:
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+#    ports:
+#      - '127.0.0.1:3000:3000'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
       - ./grafana/dashboards/:/var/lib/grafana/dashboards/
+    networks:
+      - reporting-network
+      - webapp-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/var/lib/elasticsearch/data
+#    ports:
+#      - 9200:9200
+#      - 9300:9300
+    networks:
+      - webapp-network
+
+  mongo:
+    image: mongo:6.0.7
+    restart: always
+#    ports:
+#      - 27017:27017
+    volumes:
+      - mongodata6:/data/db
+    networks:
+      - webapp-network
+
+  web:
+    build: ./server
+#    ports:
+#      - 8080:8080
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/server_db
+      - MONGO_PORT=27017
+      - MONGO_USERNAME=root
+      - MONGO_PASSWORD=example
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - PORT=8080
+    command: "npm run start:dev"
+    depends_on:
+      - elasticsearch
+      - mongo
+      - telegraf
+    volumes:
+      - ./server/src:/usr/src/app/src
+      - /usr/src/app/node_modules/
+    networks:
+      - webapp-network
 
 volumes:
   grafana_data: {}
   influxdb_data: {}
+  mongodata6: {}
+  es_data: {}
+
+networks:
+  webapp-network:
+    driver: bridge
+  reporting-network:
+    driver: bridge
+  default:
+    external:
+      name: nginx_network
+
